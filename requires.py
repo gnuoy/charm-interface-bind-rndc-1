@@ -17,37 +17,65 @@ from charms.reactive import scopes
 
 
 class BindRNDCRequires(RelationBase):
-    scope = scopes.GLOBAL
+    scope = scopes.UNIT
 
     # These remote data fields will be automatically mapped to accessors
     # with a basic documentation string provided.
-    auto_accessors = ['algorithm', 'rndckey', 'private-address']
+#    auto_accessors = ['algorithm', 'rndckey', 'private-address']
 
     @hook('{requires:bind-rndc}-relation-joined')
     def joined(self):
-        self.set_state('{relation_name}.connected')
+        conv = self.conversation()
+        conv.set_state('{relation_name}.connected')
 
     @hook('{requires:bind-rndc}-relation-changed')
     def changed(self):
-        self.set_state('{relation_name}.connected')
+        conv = self.conversation()
+        conv.set_state('{relation_name}.connected')
         if self.data_complete():
-            self.set_state('{relation_name}.available')
+            conv.set_state('{relation_name}.available')
 
     @hook('{requires:bind-rndc}-relation-{broken,departed}')
     def departed_or_broken(self):
-        self.remove_state('{relation_name}.connected')
+        conv = self.conversation()
+        conv.remove_state('{relation_name}.connected')
         if not self.data_complete():
-            self.remove_state('{relation_name}.available')
+            conv.remove_state('{relation_name}.available')
 
     def data_complete(self):
         """
         Get the connection string, if available, or None.
         """
-        data = {
-            'algorithm': self.algorithm(),
-            'secret': self.rndckey(),
-            'private_address': self.private_address(),
-        }
-        if all(data.values()):
+        if self.rndc_info() and all(self.rndc_info().values()):
             return True
         return False
+
+    def rndc_info(self):
+        """
+        Get the connection string, if available, or None.
+        """
+        data = {}
+        for conv in self.conversations():
+            data = {
+                'algorithm': conv.get_remote('algorithm'),
+                'secret': conv.get_remote('rndckey'),
+                'private_address': conv.get_remote('private-address'),
+            }
+            if all(data.values()):
+                print(data)
+                return data
+        print(data)
+        return data
+
+    def slave_ips(self):
+        # FIXME This should not be dropping down to relation_* functions
+        from charmhelpers.core import hookenv
+        values = []
+        for conversation in self.conversations():
+            for relation_id in conversation.relation_ids:
+                for unit in hookenv.related_units(relation_id):
+                    values.append({
+                        'unit': unit,
+                        'address': hookenv.relation_get('private-address',
+                                                        unit, relation_id)})
+        return values
