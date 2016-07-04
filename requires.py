@@ -64,18 +64,14 @@ class BindRNDCRequires(RelationBase):
             if all(data.values()):
                 print(data)
                 return data
-        print(data)
         return data
 
     def slave_ips(self):
-        # FIXME This should not be dropping down to relation_* functions
-        from charmhelpers.core import hookenv
         values = []
-        for conversation in self.conversations():
-            for relation_id in conversation.relation_ids:
-                for unit in hookenv.related_units(relation_id):
-                    values.append({
-                        'unit': unit,
-                        'address': hookenv.relation_get('private-address',
-                                                        unit, relation_id)})
+        for conv in self.conversations():
+            values.append({
+                # Unit scoped relation so only one unit per conversation.
+                'unit': list(conv.units)[0],
+                'address': conv.get_remote('private-address')})
         return values
+
